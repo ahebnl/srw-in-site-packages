@@ -741,11 +741,13 @@ def srwl_uti_und_gen_file_names_for_conv(_ifln, _ofn_core=None, _pref_gap=None, 
 
             listVal = [fnOrig, fnRes, gap]
 
-            if(modeFin is not ''):
+            if(modeFin != ''): #OC23032020 (to fix Py3.8 warning)
+            #if(modeFin is not ''):
                 fnRes += '_m' + modeFin
                 listVal.append(modeFin)
                 
-            if(phase is not ''):
+            if(phase != ''): #OC23032020 (to fix Py3.8 warning)
+            #if(phase is not ''):
                 fnRes += '_ph' + str(phase)
                 listVal.append(phase)
             

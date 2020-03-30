@@ -12,7 +12,8 @@ def write_text(_text, _file_path):
     f.close()
 
 #**********************Auxiliary function to read-in data comumns from ASCII file (2D table):
-def read_ascii_data_cols(_file_path, _str_sep, _i_col_start=0, _i_col_end=-1, _n_line_skip=0):
+def read_ascii_data_cols(_file_path, _str_sep, _i_col_start=0, _i_col_end=-1, _n_line_skip=0, _float=True): #OC24112019
+#def read_ascii_data_cols(_file_path, _str_sep, _i_col_start=0, _i_col_end=-1, _n_line_skip=0):
     """
     Auxiliary function to read-in data comumns from ASCII file (2D table)
     :param _file_path: full path (including file name) to the file
@@ -47,7 +48,9 @@ def read_ascii_data_cols(_file_path, _str_sep, _i_col_start=0, _i_col_end=-1, _n
             if(len(curPart) > 0):
                 if(((_i_col_start <= colCount) or (_i_col_start < 0)) and ((colCount <= _i_col_end) or (_i_col_end < 0))):
                     if len(resCols) < (colCountTrue + 1): resCols.append([])
-                    resCols[colCountTrue].append(float(curPart))
+                    #resCols[colCountTrue].append(float(curPart))
+                    if(_float): resCols[colCountTrue].append(float(curPart)) #OC24112019
+                    else: resCols[colCountTrue].append(curPart)
                     colCountTrue += 1
                 colCount += 1
     f.close()

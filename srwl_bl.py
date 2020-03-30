@@ -4,8 +4,8 @@
 # Contains a set of member objects and functions for simulating basic operation and characteristics
 # of a complete user beamline in a synchrotron radiation source.
 # Under development!!!
-# Authors/Contributors: O.C., Maksim Rakitin
-# v 0.09
+# Authors/Contributors: O.C., Maksim Rakitin, An He
+# v 0.10
 #############################################################################
 
 from __future__ import print_function #Python 2.7 compatibility
@@ -1235,7 +1235,7 @@ class SRWLBeamline(object):
 
         if _pr:
             print('Spherical wave electric field calculation ... ', end='')
-            t0 = time.time();
+            t0 = time.time()
             
         #srwl.CalcElecFieldPointSrc(wfr, self.ptSrc, [_samp_fact])
         srwl.CalcElecFieldPointSrc(wfr, locPtSrc, [_samp_fact])
@@ -2819,19 +2819,29 @@ class SRWLBeamline(object):
                 _z_fin = _v.pw_zf,
                 _mag_type = _v.pw_mag,
                 _fname= os.path.join(_v.fdir, _v.pw_fn) if(len(_v.pw_fn) > 0) else '')
+
+        #---calculate bemline optics orientations and save it to file
+        if(len(_v.op_fno) > 0): #OC23032020
+            avgPhEn = _v.w_e
+            if(_v.w_ef > 0): avgPhEn = 0.5*(_v.w_e + _v.w_ef)
+            self.set_optics(_op, _v)
+            opOrientData = self.optics.get_orient_lab_fr(_e=avgPhEn, _r=_v.op_r)
+            if(opOrientData is not None): #OC29012020
+                if(len(opOrientData) > 0):
+                    uti_io.write_ascii_data_rows(_file_path=os.path.join(_v.fdir, _v.op_fno), _rows=opOrientData, _str_sep='\t',
+                                                 _str_head='#Types of optical elements and Cartesian coordinates of their center positions and base vectors (t, s, n) in the Lab frame')
             
         #---calculate single-e and multi-e intensity distributions (before and after wavefront propagation through a beamline)
         if(_v.si or _v.ws or _v.gi or _v.wg or _v.wm):
             #if(_v.ws or _v.wg or _v.wm): self.set_optics(_op)
-            if(_v.ws or _v.wg or _v.wm): 
-                self.set_optics(_op, _v) #OC28042018
-                if(len(_v.op_fno) > 0): #OC16112019
-                    avgPhEn = _v.w_e
-                    if(_v.w_ef > 0): avgPhEn = 0.5*(_v.w_e + _v.w_ef)
-                    opOrientData = self.optics.get_orient_lab_fr(_e=avgPhEn, _r=_v.op_r)
-                    uti_io.write_ascii_data_rows(_file_path=os.path.join(_v.fdir, _v.op_fno), _rows=opOrientData, _str_sep='\t', 
-                                                 _str_head='#Types of optical elements and Cartesian coordinates of their center positions and base vectors (t, s, n) in the Lab frame')
-           
+            if(_v.ws or _v.wg or _v.wm):
+
+                #self.set_optics(_op, _v) #OC28042018
+                needSetOptics = False #OC23032020
+                if not hasattr(self, 'optics'): needSetOptics = True
+                elif self.optics is None: needSetOptics = True
+                if needSetOptics: self.set_optics(_op, _v)
+                
             ef = _v.w_e
             if(_v.w_ef > 0): ef = _v.w_ef
             mesh_w = SRWLRadMesh(

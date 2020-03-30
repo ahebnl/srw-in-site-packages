@@ -821,6 +821,53 @@ class SRWLRadMesh(object):
             except:
                 pass
 
+    def is_equal(self, _mesh, _rel_tol=1.e-07, _check_surf=False):
+        #isEqual = True
+        if(_mesh.ne != self.ne): return False
+        if(_mesh.nx != self.nx): return False
+        if(_mesh.ny != self.ny): return False
+
+        absTolE = _rel_tol*self.eStart
+        if((self.eFin > 0) and (self.eFin != self.eStart) and (self.ne > 1)): absTolE = _rel_tol*abs((self.eFin - self.eStart)/(self.ne - 1))
+        if(abs(self.eStart - _mesh.eStart) > absTolE): return False
+        if((self.eFin > 0) and (_mesh.eFin > 0)):
+            if(abs(self.eFin - _mesh.eFin) > absTolE): return False
+        
+        absTolX = _rel_tol*self.xStart
+        if((self.xFin > 0) and (self.xFin != self.xStart) and (self.nx > 1)): absTolX = _rel_tol*abs((self.xFin - self.xStart)/(self.nx - 1))
+        if(absTolX == 0): absTolX = 1.e-13 #to tune
+        if(abs(self.xStart - _mesh.xStart) > absTolX): return False
+        if((self.xFin > 0) and (_mesh.xFin > 0)):
+            if(abs(self.xFin - _mesh.xFin) > absTolX): return False
+
+        absTolY = _rel_tol*self.yStart
+        if((self.yFin > 0) and (self.yFin != self.yStart) and (self.ny > 1)): absTolY = _rel_tol*abs((self.yFin - self.yStart)/(self.ny - 1))
+        if(absTolY == 0): absTolY = 1.e-13 #to tune
+        if(abs(self.yStart - _mesh.yStart) > absTolY): return False
+        if((self.yFin > 0) and (_mesh.yFin > 0)):
+            if(abs(self.yFin - _mesh.yFin) > absTolY): return False
+
+        if(abs(_mesh.nvx - self.nvx) > _rel_tol): return False
+        if(abs(_mesh.nvy - self.nvy) > _rel_tol): return False
+        if(abs(_mesh.nvz - self.nvz) > _rel_tol): return False
+        if(abs(_mesh.hvx - self.hvx) > _rel_tol): return False
+        if(abs(_mesh.hvy - self.hvy) > _rel_tol): return False
+        if(abs(_mesh.hvz - self.hvz) > _rel_tol): return False
+
+        if(not _check_surf): return True
+        if(self.arSurf is None):
+            if(_mesh.arSurf is None): return True
+            else: return False
+        else:
+            if(_mesh.arSurf is None): return False
+            else:
+                lenArSurf = len(self.arSurf)
+                if(lenArSurf != len(_mesh.arSurf)): return False
+                for i in range(lenArSurf):
+                    if(self.arSurf[i] != _mesh.arSurf[i]): return False
+
+        return True
+
     def get_dep_type(self): #Get possible dependency type (for intensity calc.)
         depType = -1
         if((self.ne >= 1) and (self.nx == 1) and (self.ny == 1)): depType = 0
@@ -853,7 +900,7 @@ class SRWLStokes(object):
         :param _yStart: initial value of vertical position
         :param _yFin: final value of vertical position
         :param _ny: numbers of points vs vertical position
-        :param _mutual: mutual Stokes components (4*(_ne*_nx*_ny_)^2 values)
+        :param _mutual: mutual Stokes components (4*(2*_ne*_nx*_ny_)^2 values)
         """
         self.arS = _arS #flat C-aligned array of all Stokes components (outmost loop over Stokes parameter number); NOTE: only 'f' (float) is supported for the moment (Jan. 2012)
         self.numTypeStokes = _typeStokes #electric field numerical type: 'f' (float) or 'd' (double)
@@ -904,7 +951,7 @@ class SRWLStokes(object):
         nTot = _ne*_nx*_ny
         if _mutual > 0:
             #nTot *= nTot
-            nTot *= (nTot*2) #OC04052018 (since <E(r1)E(r2)*> may be a complex entity)
+            nTot *= (nTot*2) #OC04052018 (since <E(r1)E*(r2)> may be a complex entity)
         nTot *= 4 #array length of all Stokes components
         #eventually allow for storage of less than 4 Stokes components!
 
@@ -2212,6 +2259,35 @@ class SRWLWfr(object):
             _stokes.arS[i + nTot3] = self.arEy[i2p1] #imEy
         _stokes.mesh.set_from_other(self.mesh)
 
+    #def resize_mesh(self, _mesh): #Implemented in C++, see srwl.ResizeElecFieldMesh()
+    #    """Resizes the Electric Field according to given input mesh params (_mesh)"""
+    #    if(_mesh.is_equal(self.mesh)): return
+    #    if((self.mesh.nx > 1) and (self.mesh.ny > 1) and (_mesh.nx > 1) and (_mesh.ny > 1)):
+    #        xRange = self.mesh.xFin - self.mesh.xStart
+    #        xRangeFin = _mesh.xFin - _mesh.xStart
+    #        xRangeFact = xRangeFin/xRange
+    #        xStep = xRange/(self.mesh.nx - 1)
+    #        xStepFin = xRangeFin/(_mesh.nx - 1)
+    #        xResolFact = xStep/xStepFin
+    #        xcFin = 0.5*(_mesh.xStart + _mesh.xFin)
+    #        xCenFact = (xcFin - self.mesh.xStart)/xRange
+    #        yRange = self.mesh.yFin - self.mesh.yStart
+    #        yRangeFin = _mesh.yFin - _mesh.yStart
+    #        yRangeFact = yRangeFin/yRange
+    #        yStep = yRange/(self.mesh.ny - 1)
+    #        yStepFin = yRangeFin/(_mesh.ny - 1)
+    #        yResolFact = yStep/yStepFin
+    #        ycFin = 0.5*(_mesh.yStart + _mesh.yFin)
+    #        yCenFact = (ycFin - self.mesh.yStart)/yRange       
+    #        #DEBUG
+    #        #print('')
+    #        #print(xStepFin, yStepFin)
+    #        #print(xcFin, self.mesh.xStart, xRange)
+    #        #print(ycFin, self.mesh.yStart, yRange)
+    #        #print('Resizing Params:', xRangeFact, xResolFact, yRangeFact, yResolFact, xCenFact, yCenFact)
+    #        #END DEBUG
+    #        srwl.ResizeElecField(self, 'c', [0, xRangeFact, xResolFact, yRangeFact, yResolFact, xCenFact, yCenFact])
+    
     def calc_stokes(self, _stokes, _n_stokes_comp=4): #OC04052018
     #def calc_stokes(self, _stokes):
         """Calculate Stokes parameters from Electric Field"""
@@ -3083,6 +3159,63 @@ class SRWLOptMirEl(SRWLOptMir):
                      _nvx, _nvy, _nvz, _tvx, _tvy, _x, _y,
                      _refl, _n_ph_en, _n_ang, _n_comp, _ph_en_start, _ph_en_fin, _ph_en_scale_type, _ang_start, _ang_fin, _ang_scale_type)
 
+class SRWLOptMirPar(SRWLOptMir):
+    """Optical Element: Mirror: Paraboloid
+       NOTE: in the Local frame of the Mirror tangential direction is X, saggital Y, mirror normal is along Z"""
+    
+    def __init__(self, _f=1, _uc='f', _ang_graz=1e-03, _r_sag=1.e+23,
+                 _size_tang=1, _size_sag=1, _ap_shape='r', _sim_meth=2, _npt=500, _nps=500, _treat_in_out=1, _ext_in=0, _ext_out=0,
+                 _nvx=0, _nvy=0, _nvz=-1, _tvx=1, _tvy=0, _x=0, _y=0,
+                 _refl=1, _n_ph_en=1, _n_ang=1, _n_comp=1, _ph_en_start=1000., _ph_en_fin=1000., _ph_en_scale_type='lin', _ang_start=0, _ang_fin=0, _ang_scale_type='lin'):
+        """
+        :param _f: focal length [m]
+        :param _uc: use case: if _uc == 'f': assumes focusing mirror with source at infinity; if _uc == 'c': assumes collimating mirror with image at infinity
+        :param _ang_graz: grazing angle at mirror center at perfect orientation [rad]
+        :param _r_sag: sagital radius of curvature at mirror center [m]
+        :param _size_tang: size in tangential direction [m]
+        :param _size_sag: size in sagital direction [m]
+        :param _ap_shape: shape of aperture in local frame ('r' for rectangular, 'e' for elliptical)
+        :param _sim_meth: simulation method (1 for "thin" approximation, 2 for "thick" approximation)
+        :param _npt: number of mesh points to represent mirror in tangential direction (used for "thin" approximation)
+        :param _nps: number of mesh points to represent mirror in sagital direction (used for "thin" approximation)
+        :param _treat_in_out: switch specifying how to treat input and output wavefront before and after the main propagation through the optical element:
+                0- assume that the input wavefront is defined in the plane before the optical element, and the output wavefront is required in a plane just after the element;
+                1- assume that the input wavefront is defined in the plane at the optical element center and the output wavefront is also required at the element center;
+                2- assume that the input wavefront is defined in the plane at the optical element center and the output wavefront is also required at the element center; however, before the propagation though the optical element, the wavefront should be propagated through a drift back to a plane just before the optical element, then a special propagator will bring the wavefront to a plane at the optical element exit, and after this the wavefront will be propagated through a drift back to the element center;
+        :param _ext_in: optical element extent on the input side, i.e. distance between the input plane and the optical center (positive, in [m]) to be used at wavefront propagation manipulations; if 0, this extent will be calculated internally from optical element parameters
+        :param _ext_out: optical element extent on the output side, i.e. distance between the optical center and the output plane (positive, in [m]) to be used at wavefront propagation manipulations; if 0, this extent will be calculated internally from optical element parameters        
+        :param _nvx: horizontal coordinate of central normal vector
+        :param _nvy: vertical coordinate of central normal vector
+        :param _nvz: longitudinal coordinate of central normal vector
+        :param _tvx: horizontal coordinate of central tangential vector
+        :param _tvy: vertical coordinate of central tangential vector
+        :param _x: horizontal position of mirror center [m]
+        :param _y: vertical position of mirror center [m]
+        :param _refl: reflectivity coefficient to set (can be one number or C-aligned flat complex array vs photon energy vs grazing angle vs component (sigma, pi))
+        :param _n_ph_en: number of photon energy values for which the reflectivity coefficient is specified
+        :param _n_ang: number of grazing angle values for which the reflectivity coefficient is specified
+        :param _n_comp: number of electric field components for which the reflectivity coefficient is specified (can be 1 or 2)
+        :param _ph_en_start: initial photon energy value for which the reflectivity coefficient is specified
+        :param _ph_en_fin: final photon energy value for which the reflectivity coefficient is specified
+        :param _ph_en_scale_type: photon energy sampling type ('lin' for linear, 'log' for logarithmic)
+        :param _ang_start: initial grazing angle value for which the reflectivity coefficient is specified
+        :param _ang_fin: final grazing angle value for which the reflectivity coefficient is specified
+        :param _ang_scale_type: angle sampling type ('lin' for linear, 'log' for logarithmic)      
+        """
+
+        self.f = _f
+        self.uc = _uc
+        self.angGraz = _ang_graz
+        self.radSag = _r_sag
+        
+        #finishing of the mirror setup requires calling these 3 functions (with their required arguments):
+        #self.set_dim_sim_meth(_size_tang, _size_sag, _ap_shape, _sim_meth, _npt, _nps, _treat_in_out, _ext_in, _ext_out)
+        #self.set_orient(_nvx, _nvy, _nvz, _tvx, _tvy, _x, _y)
+        #self.set_reflect(_refl, _n_ph_en, _n_ang, _n_comp, _ph_en_start, _ph_en_fin, _ph_en_scale_type, _ang_start, _ang_fin, _ang_scale_type)
+        self.set_all(_size_tang, _size_sag, _ap_shape, _sim_meth, _npt, _nps, _treat_in_out, _ext_in, _ext_out,
+                     _nvx, _nvy, _nvz, _tvx, _tvy, _x, _y,
+                     _refl, _n_ph_en, _n_ang, _n_comp, _ph_en_start, _ph_en_fin, _ph_en_scale_type, _ang_start, _ang_fin, _ang_scale_type)
+
 class SRWLOptMirSph(SRWLOptMir):
     """Optical Element: Mirror: Spherical"""
 
@@ -3233,15 +3366,18 @@ class SRWLOptG(SRWLOpt):
         m_lamb_k0 = self.m*lamb*self.grDen*1000
         cff2 = _cff*_cff
         cff2_mi_1 = cff2 - 1
-        sinBeta = (m_lamb_k0*cff2 - sqrt(m_lamb_k0*m_lamb_k0*cff2 + cff2_mi_1*cff2_mi_1))/cff2_mi_1
+        #OC24032020
+        sinBeta = (m_lamb_k0*cff2 - sqrt(m_lamb_k0*m_lamb_k0*cff2 + cff2_mi_1*cff2_mi_1))/cff2_mi_1 if(_m >= 0) else (m_lamb_k0*cff2 + sqrt(m_lamb_k0*m_lamb_k0*cff2 + cff2_mi_1*cff2_mi_1))/cff2_mi_1
         sinAlpha = m_lamb_k0 - sinBeta
+        if((sinBeta < -1.) or (sinBeta > 1.) or (sinAlpha < -1.) or (sinAlpha > 1.)): return None, None
+        
         alpha = asin(sinAlpha)
         grAng = 0.5*pi - alpha
         beta = asin(sinBeta)
         defAng = pi - alpha + beta
         return grAng, defAng
 
-    def ang2cff(self, _en, _ang_graz):   #AH12042019
+    def ang2cff(self, _en, _ang_graz): #AH12042019
         """Calculates Grating grazing angle and deflection angle from photon energy and PGM parameters
         :param _en: radiation photon energy [eV]
         :param _ang_graz: grazing incidence angle [rad] the grating should be aligned for; it will be taken into account if _e_avg != 0 and _cff is None
@@ -3250,20 +3386,28 @@ class SRWLOptG(SRWLOpt):
         lamb = _Light_eV_mu*1.e-06/_en
         m_lamb_k0 = self.m*lamb*self.grDen*1000
         alpha = 0.5*pi - _ang_graz
-        cff = sqrt((cos(alpha))**2 + 2*m_lamb_k0*sin(alpha) - (m_lamb_k0)**2) / cos(alpha)
+        #cff = sqrt((cos(alpha))**2 + 2*m_lamb_k0*sin(alpha) - (m_lamb_k0)**2) / cos(alpha) #OC24032020 (commented-out)
         sinBeta = m_lamb_k0 - sin(alpha)
+        if((sinBeta < -1.) or (sinBeta > 1.)): return None, None #OC24032020
+        
         beta = asin(sinBeta)
+        cff = cos(beta)/cos(alpha) #OC24032020
+        
         defAng = pi - alpha + beta
         return cff, defAng
 
-    def angcff2en(self, _cff, _ang_graz):   #AH12042019
+    def angcff2en(self, _cff, _ang_graz): #AH12042019
         """Calculates Grating grazing angle and deflection angle from photon energy and PGM parameters
         :param _cff: PGM cff parameter, i.e. cos(beta)/cos(alpha)_en: radiation photon energy [eV]
         :param _ang_graz: grazing incidence angle [rad] the grating should be aligned for; it will be taken into account if _e_avg != 0 and _cff is None
         :return: radiation photon energy [eV] and deflection angle
         """
         alpha = 0.5*pi - _ang_graz
-        beta = -acos(_cff*cos(alpha))
+        #beta = -acos(_cff*cos(alpha))
+        cff_cos_alp = _cff*cos(alpha) #OC24032020
+        if((cff_cos_alp < -1.) or (cff_cos_alp > 1.)): return None, None
+        beta = -acos(cff_cos_alp)
+        
         m_lamb_k0 = sin(beta) + sin(alpha)
         lamb = m_lamb_k0 / (self.m*self.grDen*1000)
         en = _Light_eV_mu*1.e-06/lamb
@@ -3329,11 +3473,6 @@ class SRWLOptG(SRWLOpt):
         :param _y: vertical position of mirror center [m]
         """
         if(self.mirSub is not None): self.mirSub.set_orient(_nvx, _nvy, _nvz, _tvx, _tvy, _x, _y)
-        self.nvx = _nvx    #AH12262019
-        self.nvy = _nvy
-        self.nvz = _nvz
-        self.tvx = _tvx
-        self.tvy = _tvy
 
     def get_orient(self, _e=0): #OC18112019
         
@@ -3775,7 +3914,7 @@ class SRWLOptC(SRWLOpt):
     def get_orient_lab_fr(self, _e=0, _r=0, _v_op_ax=[0,0,1]):
         """Returns Cartesian coordinates of all optical elements' center positions and base vectors (t, s, n)
         :param _e: photon energy [eV] optical scheme shoule be represented for (required for crystals and gratings)
-        :param _r: distance to first optical element (along beam axis) [m]
+        :param _r: distance to first optical element (along beam axis) [m] or list of Cartesian coordinates of the center of the first optical element
         :param _v_op_ax: Cartesian coordinates of the initial beam axis vector in the lab frame [m]
         """
         resData = []
@@ -3783,7 +3922,9 @@ class SRWLOptC(SRWLOpt):
         if(nElem <= 0): return resData
 
         opAxVect = copy(_v_op_ax) if(_v_op_ax is not None) else [0,0,1] #Beam axis
-        P = uti_math.vect_mult(copy(opAxVect), _r) #Optical elememt position
+
+        P = _r if(isinstance(_r, list) or isinstance(_r, array)) else uti_math.vect_mult(copy(opAxVect), _r) #Optical elememt position
+        #P = uti_math.vect_mult(copy(opAxVect), _r) #Optical elememt position
         
         bmFrTrfMatr = [[1,0,0],[0,1,0],[0,0,1]] #Beam frame transformation matrix
         lenDrift = 0
@@ -3796,7 +3937,8 @@ class SRWLOptC(SRWLOpt):
                 for k in range(3): P[k] += lenDrift*opAxVect[k] #Updating (translating along beam axis) position of next optical element 
             
             elif(isinstance(opEl, SRWLOptC)): 
-                resData.append(opEl.get_orient_lab_fr(_e=_e, _r=lenDrift, _v_op_ax=opAxVect))
+                resData.append(opEl.get_orient_lab_fr(_e=_e, _r=P, _v_op_ax=opAxVect)) #?
+                #resData.append(opEl.get_orient_lab_fr(_e=_e, _r=lenDrift, _v_op_ax=opAxVect)) #Perhaps initial point should be submitted instead of lenDrift?
                 lenDrift = 0
 
             else:
@@ -8487,7 +8629,7 @@ function calculates/"extracts" Intensity from pre-calculated Electric Field
                =0 -Linear Horizontal; 
                =1 -Linear Vertical; 
                =2 -Linear 45 degrees; 
-               =3 -Linear 135 degrees;
+               =3 -Linear 135 degrees; 
                =4 -Circular Right; 
                =5 -Circular Left; 
                =6 -Total
@@ -8500,7 +8642,8 @@ function calculates/"extracts" Intensity from pre-calculated Electric Field
                =5 -Re(E): Real part of Single-Electron Electric Field;
                =6 -Im(E): Imaginary part of Single-Electron Electric Field;
                =7 -"Single-Electron" Intensity, integrated over Time or Photon Energy (i.e. Fluence)
-               =8 -"Single-Electron" Mutual Intensity (i.e. E(r)E*(r')) 
+               =8 -"Single-Electron" Mutual Intensity (i.e. E(r)E*(r'))
+               under development: =9 -"Multi-Electron" Mutual Intensity 
 :param _inDepType: input switch specifying type of dependence to be extracted:
                =0 -vs e (photon energy or time);
                =1 -vs x (horizontal position or angle);
@@ -8590,7 +8733,7 @@ function performs convolution of 1D or 2D data wave with 1D or 2D Gaussian (as d
        else if len(_mesh) == 6, 2D convolution will be performed
 :param _inSig: input list of central 2nd order statistical moments of 1D or 2D Gaussian,
        and possibly a coefficient before cross-term:
-       _inSig[0]: RMS size of teh Gaussian in first dimension
+       _inSig[0]: RMS size of the Gaussian in first dimension
        _inSig[1]: (optional) RMS size of a 2D Gaussian in second dimension
        _inSig[2]: (optional) coefficient before cross-term in exponent argument of a 2D Gaussian
        i.e. _inSig[] = [sigX, sigY, alp] defines a "tilted" normalized 2D Gaussian (vs x, y): 
